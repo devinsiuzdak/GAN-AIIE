@@ -2,43 +2,48 @@ import torch
 import torch.nn as nn
 import numpy as np
 import os
+import random
 from PIL import Image
 
-from Discriminator import Discriminiator
+from Discriminator import Discriminator
 from Generator import Generator
 
-device = torch.device('cpu')
+device = torch.device('mps')
 
 def get_random(count):
     return torch.randn(count, device=device)
 
-# center crop to 128x128
-def crop(image): # 178 / 218 ( W / H)
-    left = (178 / 2) - (128 / 2)
-    right = left + 128
-    top = (218 / 2) - (128 / 2)
-    bottom = top + 128
-
-    return image.crop((left, top, right, bottom))
-
-
-D = Discriminiator()
+D = Discriminator()
 D.to(device)
 G = Generator()
 G.to(device)
 
-directory = 'train'
-files = os.listdir(directory)
+base_directory = 'Bird_Photos'
+subfolders = [f.path for f in os.scandir(base_directory) if f.is_dir()]
+
+dataset = []
+
+for subfolder in subfolders:
+    files = os.listdir(subfolder)
+    for file in files:
+         dataset.append(subfolder + '/' + file)
+
+random.shuffle(dataset)
 
 epochs = 1
+max_images = 1000
+image_count = 0
 
 for epoch in range(epochs):
-    for i in range(100):
+    for i in range(max_images):
+
         if i % 10 == 0:
             print(i)
+        
+        image_path = dataset[i]
 
-        image = Image.open(directory + '/' + files[i])
-        image = crop(image)
+        image = Image.open(image_path)
+        image = image.resize((128, 128))
         a = np.array(image) / 255.0
         a = a.reshape(128 * 128 * 3)
 
@@ -55,5 +60,8 @@ for epoch in range(epochs):
         target = torch.FloatTensor([1.0]).to(device)
         G.train(D, get_random(300), target)
 
+        image_count += 1
+        
+       
 
 torch.save(G.state_dict(), 'gan.pth')
